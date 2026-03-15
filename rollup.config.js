@@ -5,21 +5,24 @@ import json from "@rollup/plugin-json";
 
 import dts from "rollup-plugin-dts";
 
-import packageJson from "./package.json" assert { type: "json" };
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const packageJson = require("./package.json");
 
 export default [
   {
     input: "src/index.ts",
+    external: Object.keys(packageJson.dependencies || {}),
     output: [
       {
         file: packageJson.main,
         format: "cjs",
-        sourcemap: true,
+        sourcemap: false,
       },
       {
         file: packageJson.module,
         format: "esm",
-        sourcemap: true,
+        sourcemap: false,
       },
     ],
     plugins: [resolve(), commonjs(), json(), typescript({ tsconfig: "./tsconfig.json" })],

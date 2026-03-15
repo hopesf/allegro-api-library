@@ -1,28 +1,26 @@
 import axios from "axios";
 import { generateHeaders } from "./generateHeaders";
-import { uuid } from 'uuidv4';
-import { IAllegroApi, RequestOptions } from "../interfaces";
-import { ALLEGRO_API_URL, headerJson } from "../config";
+import { v4 as uuidv4 } from 'uuid';
+import { IAllegroApi, RequestOptions, AllegroApiOptions } from "../interfaces";
+import { ALLEGRO_API_URL, ALLEGRO_SANDBOX_API_URL, headerJson, AllegroEnvironment } from "../config";
 
 const allegroApi: IAllegroApi = {
     headerConfig: null,
     initialized: false,
+    environment: "production" as AllegroEnvironment,
 
-    async initialize(accessToken: string): Promise<void> {
-        if (this.initialized) {
-            return;
+    get baseUrl(): string {
+        return this.environment === "sandbox" ? ALLEGRO_SANDBOX_API_URL : ALLEGRO_API_URL;
+    },
+
+    async initialize(accessToken: string, options?: AllegroApiOptions): Promise<void> {
+        if (!accessToken) {
+            throw new Error("Access token is required.");
         }
 
-        try {
-            if (!accessToken) {
-                throw new Error("Access token is required.");
-            }
-
-            this.headerConfig = await generateHeaders(accessToken, headerJson); // Update this line
-            this.initialized = true;
-        } catch (error) {
-            throw error;
-        }
+        this.environment = options?.environment ?? "production";
+        this.headerConfig = generateHeaders(accessToken, headerJson);
+        this.initialized = true;
     },
 
     async makeRequest<T>({ url, body = null, method = "GET" }: RequestOptions): Promise<T> {
@@ -43,276 +41,156 @@ const allegroApi: IAllegroApi = {
                 const { data } = await axios.patch(url, body, { headers: this.headerConfig });
                 return data;
             }
-            const { data } = body === null ? await axios.get(url, { headers: this.headerConfig }) : await axios.post(url, body, { headers: this.headerConfig });
+            if (body !== null) {
+                const { data } = await axios.post(url, body, { headers: this.headerConfig });
+                return data;
+            }
+            const { data } = await axios.get(url, { headers: this.headerConfig });
             return data;
         } catch (error: any) {
-            throw error.response.data;
+            if (error?.response?.data) {
+                throw error.response.data;
+            }
+            throw error;
         }
     },
 
-    async getProducts(body: any): Promise<any> {
-        return await this.makeRequest({ body, method: "POST", url: `${ALLEGRO_API_URL}/sale/offers` });
+    async getOffers(params?: Record<string, any>): Promise<any> {
+        const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/offers${query}` });
     },
 
-    async getProductByOfferId(offerId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/product-offers/${offerId}` });
+    async getOfferByOfferId(offerId: string): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/product-offers/${offerId}` });
     },
 
-    async createProduct(values: any): Promise<any> {
-        return await this.makeRequest({ body: values, method: "POST", url: `${ALLEGRO_API_URL}/sale/product-offers` });
+    async createOffer(values: any): Promise<any> {
+        return await this.makeRequest({ body: values, method: "POST", url: `${this.baseUrl}/sale/product-offers` });
     },
 
-    async deleteProduct(offerId: string): Promise<any> {
-        return await this.makeRequest({ method: "DELETE", url: `${ALLEGRO_API_URL}/sale/offers/${offerId}` });
+    async deleteOffer(offerId: string): Promise<any> {
+        return await this.makeRequest({ method: "DELETE", url: `${this.baseUrl}/sale/offers/${offerId}` });
     },
 
-    async publishProduct(values: any): Promise<any> {
-        const url = `${ALLEGRO_API_URL}/sale/offer-publication-commands/${uuid()}`;
-        return await this.makeRequest({ body: values, method: "PUT", url });
-    },
-
-    async uploadPhoto(headers: any, buffer: any): Promise<any> {
-        const url = `${ALLEGRO_API_URL}/sale/images`;
-        this.headerConfig = headers;
-        return await this.makeRequest({ body: buffer, method: "POST", url });
-    },
-
-    async updateProduct(offerId: string, values: any): Promise<any> {
+    async updateOffer(offerId: string, values: any): Promise<any> {
         return await this.makeRequest({
             body: values,
             method: "PATCH",
-            url: `${ALLEGRO_API_URL}/sale/product-offers/${offerId}`,
+            url: `${this.baseUrl}/sale/product-offers/${offerId}`,
         });
     },
 
-    async getCategories(): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/categories` });
+    async publishOffer(commandId: string, values: any): Promise<any> {
+        const url = `${this.baseUrl}/sale/offer-publication-commands/${commandId}`;
+        return await this.makeRequest({ body: values, method: "PUT", url });
+    },
+
+    async publishOfferWithNewCommandId(values: any): Promise<any> {
+        const url = `${this.baseUrl}/sale/offer-publication-commands/${uuidv4()}`;
+        return await this.makeRequest({ body: values, method: "PUT", url });
+    },
+
+    async uploadPhoto(imageBuffer: Buffer, contentType: string = "image/jpeg"): Promise<any> {
+        const headers = {
+            ...this.headerConfig,
+            "Content-Type": contentType,
+        };
+        const url = `${this.baseUrl}/sale/images`;
+        const { data } = await axios.post(url, imageBuffer, { headers });
+        return data;
+    },
+
+    async getCategories(parentId?: string): Promise<any> {
+        const query = parentId ? `?parent.id=${parentId}` : "";
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/categories${query}` });
     },
 
     async getCategoryById(categoryId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}` });
-    },
-
-    async createCategory(values: any): Promise<any> {
-        return await this.makeRequest({ body: values, method: "POST", url: `${ALLEGRO_API_URL}/sale/categories` });
-    },
-
-    async updateCategory(categoryId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}`,
-        });
-    },
-
-    async deleteCategory(categoryId: string): Promise<any> {
-        return await this.makeRequest({ method: "DELETE", url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}` });
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/categories/${categoryId}` });
     },
 
     async getCategoryParameters(categoryId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters` });
-    },
-
-    async getCategoryParameterById(categoryId: string, parameterId: string): Promise<any> {
-        return await this.makeRequest({
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}`,
-        });
-    },
-
-    async createCategoryParameter(categoryId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "POST",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters`,
-        });
-    },
-
-    async updateCategoryParameter(categoryId: string, parameterId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}`,
-        });
-    },
-
-    async deleteCategoryParameter(categoryId: string, parameterId: string): Promise<any> {
-        return await this.makeRequest({
-            method: "DELETE",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}`,
-        });
-    },
-
-    async getCategoryParameterOptions(categoryId: string, parameterId: string): Promise<any> {
-        return await this.makeRequest({
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}/options`,
-        });
-    },
-
-    async getCategoryParameterOptionById(categoryId: string, parameterId: string, optionId: string): Promise<any> {
-        return await this.makeRequest({
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}/options/${optionId}`,
-        });
-    },
-
-    async createCategoryParameterOption(categoryId: string, parameterId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "POST",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}/options`,
-        });
-    },
-
-    async updateCategoryParameterOption(categoryId: string, parameterId: string, optionId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}/options/${optionId}`,
-        });
-    },
-
-    async deleteCategoryParameterOption(categoryId: string, parameterId: string, optionId: string): Promise<any> {
-        return await this.makeRequest({
-            method: "DELETE",
-            url: `${ALLEGRO_API_URL}/sale/categories/${categoryId}/parameters/${parameterId}/options/${optionId}`,
-        });
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/categories/${categoryId}/parameters` });
     },
 
     async getWarranties(): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/warranties` });
+        return await this.makeRequest({ url: `${this.baseUrl}/after-sales-service-conditions/warranties` });
     },
 
     async getWarrantyById(warrantyId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/warranties/${warrantyId}` });
+        return await this.makeRequest({ url: `${this.baseUrl}/after-sales-service-conditions/warranties/${warrantyId}` });
     },
 
     async createWarranty(values: any): Promise<any> {
-        return await this.makeRequest({ body: values, method: "POST", url: `${ALLEGRO_API_URL}/sale/warranties` });
+        return await this.makeRequest({ body: values, method: "POST", url: `${this.baseUrl}/after-sales-service-conditions/warranties` });
     },
 
     async updateWarranty(warrantyId: string, values: any): Promise<any> {
         return await this.makeRequest({
             body: values,
             method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/warranties/${warrantyId}`,
+            url: `${this.baseUrl}/after-sales-service-conditions/warranties/${warrantyId}`,
         });
-    },
-
-    async deleteWarranty(warrantyId: string): Promise<any> {
-        return await this.makeRequest({ method: "DELETE", url: `${ALLEGRO_API_URL}/sale/warranties/${warrantyId}` });
     },
 
     async getDeliveryMethods(): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/delivery-methods` });
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/delivery-methods` });
     },
 
-    async getDeliveryMethodById(deliveryMethodId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/delivery-methods/${deliveryMethodId}` });
+    async getShippingRates(): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/shipping-rates` });
     },
 
-    async createDeliveryMethod(values: any): Promise<any> {
-        return await this.makeRequest({ body: values, method: "POST", url: `${ALLEGRO_API_URL}/sale/delivery-methods` });
+    async getShippingRateById(shippingRateId: string): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/shipping-rates/${shippingRateId}` });
     },
 
-    async updateDeliveryMethod(deliveryMethodId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/delivery-methods/${deliveryMethodId}`,
-        });
-    },
-
-    async deleteDeliveryMethod(deliveryMethodId: string): Promise<any> {
-        return await this.makeRequest({
-            method: "DELETE",
-            url: `${ALLEGRO_API_URL}/sale/delivery-methods/${deliveryMethodId}`,
-        });
-    },
-
-    async getPayments(): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/payment-methods` });
-    },
-
-    async getPaymentById(paymentId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/payment-methods/${paymentId}` });
-    },
-
-    async createPayment(values: any): Promise<any> {
-        return await this.makeRequest({ body: values, method: "POST", url: `${ALLEGRO_API_URL}/sale/payment-methods` });
-    },
-
-    async updatePayment(paymentId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/payment-methods/${paymentId}`,
-        });
-    },
-
-    async deletePayment(paymentId: string): Promise<any> {
-        return await this.makeRequest({
-            method: "DELETE",
-            url: `${ALLEGRO_API_URL}/sale/payment-methods/${paymentId}`,
-        });
-    },
-
-    async getOfferPublicationCommands(): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/offer-publication-commands` });
+    async getPaymentOperations(params?: Record<string, any>): Promise<any> {
+        const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+        return await this.makeRequest({ url: `${this.baseUrl}/payments/payment-operations${query}` });
     },
 
     async getOfferPublicationCommandById(offerPublicationCommandId: string): Promise<any> {
         return await this.makeRequest({
-            url: `${ALLEGRO_API_URL}/sale/offer-publication-commands/${offerPublicationCommandId}`,
+            url: `${this.baseUrl}/sale/offer-publication-commands/${offerPublicationCommandId}`,
         });
     },
 
-    async createOfferPublicationCommand(values: any): Promise<any> {
+    async getOfferPublicationCommandTasks(offerPublicationCommandId: string): Promise<any> {
         return await this.makeRequest({
-            body: values,
-            method: "POST",
-            url: `${ALLEGRO_API_URL}/sale/offer-publication-commands`,
+            url: `${this.baseUrl}/sale/offer-publication-commands/${offerPublicationCommandId}/tasks`,
         });
     },
 
-    async updateOfferPublicationCommand(offerPublicationCommandId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/offer-publication-commands/${offerPublicationCommandId}`,
-        });
+    async getOfferEvents(params?: Record<string, any>): Promise<any> {
+        const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/offer-events${query}` });
     },
 
-    async deleteOfferPublicationCommand(offerPublicationCommandId: string): Promise<any> {
-        return await this.makeRequest({
-            method: "DELETE",
-            url: `${ALLEGRO_API_URL}/sale/offer-publication-commands/${offerPublicationCommandId}`,
-        });
+    async getOrders(params?: Record<string, any>): Promise<any> {
+        const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+        return await this.makeRequest({ url: `${this.baseUrl}/order/checkout-forms${query}` });
     },
 
-    async getOfferEvents(): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/offer-events` });
+    async getOrderById(orderId: string): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/order/checkout-forms/${orderId}` });
     },
 
-    async getOfferEventById(offerEventId: string): Promise<any> {
-        return await this.makeRequest({ url: `${ALLEGRO_API_URL}/sale/offer-events/${offerEventId}` });
+    async getOrderShipments(orderId: string): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/order/checkout-forms/${orderId}/shipments` });
     },
 
-    async createOfferEvent(values: any): Promise<any> {
-        return await this.makeRequest({ body: values, method: "POST", url: `${ALLEGRO_API_URL}/sale/offer-events` });
+    async getIssues(params?: Record<string, any>): Promise<any> {
+        const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/issues${query}` });
     },
 
-    async updateOfferEvent(offerEventId: string, values: any): Promise<any> {
-        return await this.makeRequest({
-            body: values,
-            method: "PUT",
-            url: `${ALLEGRO_API_URL}/sale/offer-events/${offerEventId}`,
-        });
+    async getIssueById(issueId: string): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/sale/issues/${issueId}` });
     },
 
-    async deleteOfferEvent(offerEventId: string): Promise<any> {
-        return await this.makeRequest({
-            method: "DELETE",
-            url: `${ALLEGRO_API_URL}/sale/offer-events/${offerEventId}`,
-        });
+    async getUserInfo(): Promise<any> {
+        return await this.makeRequest({ url: `${this.baseUrl}/me` });
     },
 };
 
