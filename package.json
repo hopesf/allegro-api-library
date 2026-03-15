@@ -1,6 +1,6 @@
 {
   "name": "allegro-api-library",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Allegro marketplace REST API wrapper with OAuth2 support and sandbox environment",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
