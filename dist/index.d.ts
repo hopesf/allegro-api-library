@@ -1,5 +1,7 @@
 declare const ALLEGRO_API_URL = "https://api.allegro.pl";
 declare const ALLEGRO_SANDBOX_API_URL = "https://api.allegro.pl.allegrosandbox.pl";
+declare const ALLEGRO_UPLOAD_URL = "https://upload.allegro.pl";
+declare const ALLEGRO_SANDBOX_UPLOAD_URL = "https://upload.allegro.pl.allegrosandbox.pl";
 declare const ALLEGRO_AUTH_URL = "https://allegro.pl";
 declare const ALLEGRO_SANDBOX_AUTH_URL = "https://allegro.pl.allegrosandbox.pl";
 declare const headerJson = "application/vnd.allegro.public.v1+json";
@@ -78,5 +80,5 @@ declare function exchangeCodeForToken(clientId: string, clientSecret: string, co
  */
 declare function refreshAccessToken(clientId: string, clientSecret: string, refreshToken: string, environment?: AllegroEnvironment): Promise<AllegroTokenResponse>;
 
-export { ALLEGRO_API_URL, ALLEGRO_AUTH_URL, ALLEGRO_SANDBOX_API_URL, ALLEGRO_SANDBOX_AUTH_URL, allegroApi, exchangeCodeForToken, getAuthorizationUrl, getClientCredentialsToken, headerJson, refreshAccessToken };
+export { ALLEGRO_API_URL, ALLEGRO_AUTH_URL, ALLEGRO_SANDBOX_API_URL, ALLEGRO_SANDBOX_AUTH_URL, ALLEGRO_SANDBOX_UPLOAD_URL, ALLEGRO_UPLOAD_URL, allegroApi, exchangeCodeForToken, getAuthorizationUrl, getClientCredentialsToken, headerJson, refreshAccessToken };
 export type { AllegroApiOptions, AllegroEnvironment, AllegroTokenResponse, IAllegroApi, RequestOptions };

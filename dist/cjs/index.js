@@ -45,6 +45,8 @@ const generateHeaders = (token, contentType) => {
 
 const ALLEGRO_API_URL = "https://api.allegro.pl";
 const ALLEGRO_SANDBOX_API_URL = "https://api.allegro.pl.allegrosandbox.pl";
+const ALLEGRO_UPLOAD_URL = "https://upload.allegro.pl";
+const ALLEGRO_SANDBOX_UPLOAD_URL = "https://upload.allegro.pl.allegrosandbox.pl";
 const ALLEGRO_AUTH_URL = "https://allegro.pl";
 const ALLEGRO_SANDBOX_AUTH_URL = "https://allegro.pl.allegrosandbox.pl";
 const headerJson = "application/vnd.allegro.public.v1+json";
@@ -145,10 +147,23 @@ const allegroApi = {
     },
     uploadPhoto(imageBuffer_1) {
         return __awaiter(this, arguments, void 0, function* (imageBuffer, contentType = "image/jpeg") {
+            var _a;
+            if (!this.initialized) {
+                throw new Error("Allegro API is not initialized. Please call initialize() first.");
+            }
+            // Image uploads are served from a dedicated upload host, not the main API host.
+            const uploadBase = this.environment === "sandbox" ? ALLEGRO_SANDBOX_UPLOAD_URL : ALLEGRO_UPLOAD_URL;
             const headers = Object.assign(Object.assign({}, this.headerConfig), { "Content-Type": contentType });
-            const url = `${this.baseUrl}/sale/images`;
-            const { data } = yield axios.post(url, imageBuffer, { headers });
-            return data;
+            try {
+                const { data } = yield axios.post(`${uploadBase}/sale/images`, imageBuffer, { headers });
+                return data;
+            }
+            catch (error) {
+                if ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) {
+                    throw error.response.data;
+                }
+                throw error;
+            }
         });
     },
     getCategories(parentId) {
@@ -342,6 +357,8 @@ exports.ALLEGRO_API_URL = ALLEGRO_API_URL;
 exports.ALLEGRO_AUTH_URL = ALLEGRO_AUTH_URL;
 exports.ALLEGRO_SANDBOX_API_URL = ALLEGRO_SANDBOX_API_URL;
 exports.ALLEGRO_SANDBOX_AUTH_URL = ALLEGRO_SANDBOX_AUTH_URL;
+exports.ALLEGRO_SANDBOX_UPLOAD_URL = ALLEGRO_SANDBOX_UPLOAD_URL;
+exports.ALLEGRO_UPLOAD_URL = ALLEGRO_UPLOAD_URL;
 exports.allegroApi = allegroApi;
 exports.exchangeCodeForToken = exchangeCodeForToken;
 exports.getAuthorizationUrl = getAuthorizationUrl;

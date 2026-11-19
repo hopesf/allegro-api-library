@@ -2,7 +2,7 @@ import axios from "axios";
 import { generateHeaders } from "./generateHeaders";
 import { v4 as uuidv4 } from 'uuid';
 import { IAllegroApi, RequestOptions, AllegroApiOptions } from "../interfaces";
-import { ALLEGRO_API_URL, ALLEGRO_SANDBOX_API_URL, headerJson, AllegroEnvironment } from "../config";
+import { ALLEGRO_API_URL, ALLEGRO_SANDBOX_API_URL, ALLEGRO_UPLOAD_URL, ALLEGRO_SANDBOX_UPLOAD_URL, headerJson, AllegroEnvironment } from "../config";
 
 const allegroApi: IAllegroApi = {
     headerConfig: null,
@@ -91,13 +91,24 @@ const allegroApi: IAllegroApi = {
     },
 
     async uploadPhoto(imageBuffer: Buffer, contentType: string = "image/jpeg"): Promise<any> {
+        if (!this.initialized) {
+            throw new Error("Allegro API is not initialized. Please call initialize() first.");
+        }
+        // Image uploads are served from a dedicated upload host, not the main API host.
+        const uploadBase = this.environment === "sandbox" ? ALLEGRO_SANDBOX_UPLOAD_URL : ALLEGRO_UPLOAD_URL;
         const headers = {
             ...this.headerConfig,
             "Content-Type": contentType,
         };
-        const url = `${this.baseUrl}/sale/images`;
-        const { data } = await axios.post(url, imageBuffer, { headers });
-        return data;
+        try {
+            const { data } = await axios.post(`${uploadBase}/sale/images`, imageBuffer, { headers });
+            return data;
+        } catch (error: any) {
+            if (error?.response?.data) {
+                throw error.response.data;
+            }
+            throw error;
+        }
     },
 
     async getCategories(parentId?: string): Promise<any> {

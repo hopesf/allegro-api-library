@@ -11,7 +11,7 @@ npm install allegro-api-library
 ## Quick Start
 
 ```typescript
-import allegroApi from 'allegro-api-library';
+import { allegroApi } from 'allegro-api-library';
 
 // Initialize in production
 await allegroApi.initialize('YOUR_ACCESS_TOKEN');
@@ -33,7 +33,7 @@ const me = await allegroApi.getUserInfo();
 For background operations that don't require user interaction:
 
 ```typescript
-import { getClientCredentialsToken } from 'allegro-api-library';
+import { allegroApi, getClientCredentialsToken } from 'allegro-api-library';
 
 const token = await getClientCredentialsToken(
   'YOUR_CLIENT_ID',
@@ -48,6 +48,7 @@ await allegroApi.initialize(token.access_token);
 
 ```typescript
 import {
+  allegroApi,
   getAuthorizationUrl,
   exchangeCodeForToken,
   refreshAccessToken
@@ -66,7 +67,8 @@ const token = await exchangeCodeForToken(
   'YOUR_CLIENT_ID',
   'YOUR_CLIENT_SECRET',
   req.query.code,
-  'https://yourapp.com/callback'
+  'https://yourapp.com/callback',
+  'production' // or 'sandbox'
 );
 
 await allegroApi.initialize(token.access_token);
@@ -75,7 +77,8 @@ await allegroApi.initialize(token.access_token);
 const newToken = await refreshAccessToken(
   'YOUR_CLIENT_ID',
   'YOUR_CLIENT_SECRET',
-  token.refresh_token!
+  token.refresh_token!,
+  'production' // or 'sandbox'
 );
 ```
 
@@ -84,7 +87,7 @@ const newToken = await refreshAccessToken(
 Allegro Sandbox lets you test without affecting your production data. Create a sandbox account at the [Allegro Developer Portal](https://developer.allegro.pl).
 
 ```typescript
-import { getClientCredentialsToken } from 'allegro-api-library';
+import { allegroApi, getClientCredentialsToken } from 'allegro-api-library';
 
 const token = await getClientCredentialsToken(
   'SANDBOX_CLIENT_ID',
@@ -117,7 +120,7 @@ await allegroApi.initialize(token.access_token, { environment: 'sandbox' });
 | `deleteOffer(offerId)` | Delete an offer |
 | `publishOffer(commandId, values)` | Publish an offer with a given command ID |
 | `publishOfferWithNewCommandId(values)` | Publish an offer with an auto-generated UUID |
-| `uploadPhoto(buffer, contentType?)` | Upload an image |
+| `uploadPhoto(buffer, contentType?)` | Upload an image (uses Allegro's upload host) |
 
 ### Categories
 
@@ -156,7 +159,7 @@ await allegroApi.initialize(token.access_token, { environment: 'sandbox' });
 |--------|-------------|
 | `getOrders(params?)` | List orders |
 | `getOrderById(orderId)` | Get an order by ID |
-| `getOrderItems(orderId)` | Get line items for an order |
+| `getOrderShipments(orderId)` | Get shipments for an order |
 
 ### Offer Publication Commands
 
@@ -171,12 +174,12 @@ await allegroApi.initialize(token.access_token, { environment: 'sandbox' });
 |--------|-------------|
 | `getOfferEvents(params?)` | Get the offer event log |
 
-### Disputes
+### Issues (post-purchase)
 
 | Method | Description |
 |--------|-------------|
-| `getDisputes(params?)` | List disputes |
-| `getDisputeById(disputeId)` | Get a dispute by ID |
+| `getIssues(params?)` | List issues |
+| `getIssueById(issueId)` | Get an issue by ID |
 
 ### User
 
